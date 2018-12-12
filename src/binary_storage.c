@@ -17,7 +17,10 @@
 #include "utils.h"
 #include "fuse_xattrs_config.h"
 
-#include <attr/xattr.h>
+#include <sys/xattr.h>
+#ifndef ENOATTR
+#define ENOATTR ENODATA
+#endif
 
 struct on_memory_attr {
     u_int16_t name_size;
