@@ -7,20 +7,22 @@
   See the file COPYING.
 */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
 
+#include "debug.h"
 #include "binary_storage.h"
 #include "utils.h"
 #include "fuse_xattrs_config.h"
 
-#include <sys/xattr.h>
-#ifndef ENOATTR
-#define ENOATTR ENODATA
-#endif
+#include <attr/xattr.h>
 
 struct on_memory_attr {
     u_int16_t name_size;
@@ -61,32 +63,34 @@ char *__read_file(const char *path, int *buffer_size)
     char *buffer = NULL;
 
     if (file == NULL) {
-        debug_print("file not found: %s\n", path);
-        *buffer_size = -ENOENT;
+    	const int error = errno;
+        ERROR_MSG("fopen file %s error %d (%m)", path,error);
+        *buffer_size = -error;
         return NULL;
     }
 
-    debug_print("file found, reading it: %s\n", path);
+    DEBUG_MSG("file found, reading it: %s", path);
 
     fseek(file, 0, SEEK_END);
     *buffer_size = (int)ftell(file);
 
     if (*buffer_size == -1) {
-        error_print("error: path: %s, size: %d, errno=%d\n", path, *buffer_size, errno);
-        *buffer_size = errno;
+    	const int error = errno;
+    	ERROR_MSG("ftell %s, size: %d, error=%d (%m)", path, *buffer_size, errno);
+        *buffer_size = -error;
         fclose(file);
         return NULL;
     }
 
     if (*buffer_size > MAX_METADATA_SIZE) {
-        error_print("metadata file too big. path: %s, size: %d\n", path, *buffer_size);
+    	ERROR_MSG("metadata file too big. path: %s, size: %d", path, *buffer_size);
         *buffer_size = -ENOSPC;
         fclose(file);
         return NULL;
     }
 
     if (*buffer_size == 0) {
-        debug_print("empty file.\n");
+        DEBUG_MSG("empty file.");
         *buffer_size = -ENOENT;
         fclose(file);
         return NULL;
@@ -98,13 +102,13 @@ char *__read_file(const char *path, int *buffer_size)
     buffer = malloc(_buffer_size);
     if (buffer == NULL) {
         *buffer_size = -ENOMEM;
-        error_print("cannot allocate memory.\n");
+        ERROR_MSG("cannot allocate %zu bytes of memory.",_buffer_size);
         fclose(file);
         return NULL;
     }
 
     memset(buffer, '\0', _buffer_size);
-    fread(buffer, 1, _buffer_size, file);
+    size_t n = fread(buffer, 1, _buffer_size, file);
     fclose(file);
 
     return buffer;
@@ -113,7 +117,7 @@ char *__read_file(const char *path, int *buffer_size)
 char *__read_file_sidecar(const char *path, int *buffer_size)
 {
     char *sidecar_path = get_sidecar_path(path);
-    debug_print("path=%s sidecar_path=%s\n", path, sidecar_path);
+    DEBUG_MSG("path=%s sidecar_path=%s", path, sidecar_path);
 
     char *buffer = __read_file(sidecar_path, buffer_size);
     free (sidecar_path);
@@ -123,12 +127,12 @@ char *__read_file_sidecar(const char *path, int *buffer_size)
 int __cmp_name(const char *name, size_t name_length, struct on_memory_attr *attr)
 {
     if (attr->name_size == name_length && memcmp(attr->name, name, name_length) == 0) {
-        debug_print("match: name=%s, name_length=%zu\n", name, name_length);
+        DEBUG_MSG("match: name=%s, name_length=%zu", name, name_length);
         __print_on_memory_attr(attr);
         return 1;
     }
 
-    debug_print("doesn't match: name=%s, name_length=%zu\n", name, name_length);
+    DEBUG_MSG("doesn't match: name=%s, name_length=%zu", name, name_length);
     __print_on_memory_attr(attr);
 
     return 0;
@@ -136,7 +140,7 @@ int __cmp_name(const char *name, size_t name_length, struct on_memory_attr *attr
 
 struct on_memory_attr *__read_on_memory_attr(size_t *offset, char *buffer, size_t buffer_size)
 {
-    debug_print("offset=%zu\n", *offset);
+	DEBUG_MSG("offset=%zu\n", *offset);
     struct on_memory_attr *attr = malloc(sizeof(struct on_memory_attr));
     attr->name = NULL;
     attr->value = NULL;
@@ -145,19 +149,19 @@ struct on_memory_attr *__read_on_memory_attr(size_t *offset, char *buffer, size_
     // Read name size
     size_t data_size = sizeof(u_int16_t);
     if (*offset + data_size > buffer_size) {
-        error_print("Error, sizes doesn't match.\n");
+        ERROR_MSG("Error, sizes doesn't match.");
         __free_on_memory_attr(attr);
         return NULL;
     }
     memcpy(&attr->name_size, buffer + *offset, data_size);
     *offset += data_size;
-    debug_print("attr->name_size=%hu\n", attr->name_size);
+    DEBUG_MSG("attr->name_size=%hu", attr->name_size);
 
     ////////////////////////////////
     // Read name data
     data_size = attr->name_size;
     if (*offset + data_size > buffer_size) {
-        error_print("Error, sizes doesn't match.\n");
+        ERROR_MSG("Error, sizes doesn't match.");
         __free_on_memory_attr(attr);
         return NULL;
     }
@@ -169,19 +173,19 @@ struct on_memory_attr *__read_on_memory_attr(size_t *offset, char *buffer, size_
     // Read value size
     data_size = sizeof(size_t);
     if (*offset + data_size > buffer_size) {
-        error_print("Error, sizes doesn't match.\n");
+        ERROR_MSG("Error, sizes doesn't match.");
         __free_on_memory_attr(attr);
         return NULL;
     }
     memcpy(&attr->value_size, buffer + *offset, data_size);
     *offset += data_size;
-    debug_print("attr->value_size=%zu\n", attr->value_size);
+    DEBUG_MSG("attr->value_size=%zu\n", attr->value_size);
 
     ////////////////////////////////
     // Read value data
     data_size = attr->value_size;
     if (*offset + data_size > buffer_size) {
-        error_print("Error, sizes doesn't match. data_size=%zu buffer_size=%zu\n",
+        ERROR_MSG("Error, sizes doesn't match. data_size=%zu buffer_size=%zu",
             data_size, buffer_size);
 
         __free_on_memory_attr(attr);
@@ -200,26 +204,34 @@ int __write_to_file(FILE *file, const char *name, const char *value, const size_
 
 #ifdef DEBUG
     char *sanitized_value = sanitize_value(value, value_size);
-    debug_print("name='%s' name_size=%zu sanitized_value='%s' value_size=%zu\n", name, name_size, sanitized_value, value_size);
+    DEBUG_MSG("name='%s' name_size=%zu sanitized_value='%s' value_size=%zu", name, name_size, sanitized_value, value_size);
     free(sanitized_value);
 #endif
 
     // write name
     if (fwrite(&name_size, sizeof(u_int16_t), 1, file) != 1) {
-        return -1;
+    	const int error = errno;
+    	ERROR_MSG("fwrite %s name size error %d (%m)",name,error);
+        return -error;
     }
     if (fwrite(name, name_size, 1, file) != 1) {
-        return -1;
+    	const int error = errno;
+    	ERROR_MSG("fwrite %s name error %d (%m)",name,error);
+    	return -error;
     }
 
     // write value
     if (fwrite(&value_size, sizeof(size_t), 1, file) != 1) {
-        return -1;
+    	const int error = errno;
+    	ERROR_MSG("fwrite %s value size error %d (%m)",name,error);
+    	return -error;
     }
     // write value content only if we have something to write.
     if (value_size > 0) {
         if (fwrite(value, value_size, 1, file) != 1) {
-            return -1;
+        	const int error = errno;
+        	ERROR_MSG("fwrite %s value error %d (%m)",name,error);
+        	return -error;
         }
     }
 
@@ -261,9 +273,9 @@ int binary_storage_write_key(const char *path, const char *name, const char *val
     free(sidecar_path);
 
     if (buffer == NULL) {
-        debug_print("new file, writing directly...\n");
+        DEBUG_MSG("new file, writing directly...");
         status = __write_to_file(file, name, value, size);
-        assert(status == 0);
+        //assert(status == 0);
         fclose(file);
         free(buffer);
         return 0;
@@ -280,26 +292,33 @@ int binary_storage_write_key(const char *path, const char *name, const char *val
         debug_print("replaced=%d offset=%zu buffer_size=%zu\n", replaced, offset, _buffer_size);
         struct on_memory_attr *attr = __read_on_memory_attr(&offset, buffer, _buffer_size);
 
-        // FIXME: handle attr == NULL
-        assert(attr != NULL);
+        if (attr) {
+        	// FIXME: handle attr == NULL
+			//assert(attr != NULL);
 
-        if (memcmp(attr->name, name, name_len) == 0) {
-            assert(replaced == 0);
-            if (flags & XATTR_CREATE) {
-                error_print("Key already exists. (flag XATTR_CREATE)");
-                status = __write_to_file(file, attr->name, attr->value, attr->value_size);
-                assert(status == 0);
-                res = -EEXIST;
-            } else {
-                status = __write_to_file(file, name, value, size);
-                assert(status == 0);
-                replaced = 1;
-            }
+			if (memcmp(attr->name, name, name_len) == 0) {
+				assert(replaced == 0);
+				if (flags & XATTR_CREATE) {
+					error_print("Key already exists. (flag XATTR_CREATE)");
+					res = __write_to_file(file, attr->name, attr->value, attr->value_size);
+					//assert(status == 0);
+					if (0 == res) {
+						res = -EEXIST;
+					}
+				} else {
+					res = __write_to_file(file, name, value, size);
+					//assert(status == 0);
+					replaced = 1;
+				}
+			} else {
+				res = __write_to_file(file, attr->name, attr->value, attr->value_size);
+				//assert(status == 0);
+			}
+			__free_on_memory_attr(attr);
         } else {
-            status = __write_to_file(file, attr->name, attr->value, attr->value_size);
-            assert(status == 0);
+        	ERROR_MSG("attr is NULL");
+        	res = EINVAL;
         }
-        __free_on_memory_attr(attr);
     }
 
     if (replaced == 0 && res == 0) {
@@ -307,8 +326,8 @@ int binary_storage_write_key(const char *path, const char *name, const char *val
             error_print("Key doesn't exists. (flag XATTR_REPLACE)");
             res = -ENODATA;
         } else {
-            status = __write_to_file(file, name, value, size);
-            assert(status == 0);
+            res = __write_to_file(file, name, value, size);
+            //assert(status == 0);
         }
     }
 

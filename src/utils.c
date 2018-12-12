@@ -7,6 +7,10 @@
   See the file COPYING.
 */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -70,13 +74,27 @@ char *get_sidecar_path(const char *path)
     return sidecar_path;
 }
 
-// TODO: make it work for binary data
+char* bin_to_ascii(const void *address, unsigned int size,char *buffer)
+{
+	register const unsigned char *cursor = (const unsigned char *)address;
+	const unsigned char* const limit = cursor + size;
+	register char *hexaCursor = buffer;
+
+	while(cursor < limit) {
+		hexaCursor += sprintf(hexaCursor,"%.2X ",*cursor);
+		cursor++;
+	}
+	return buffer;
+}
+
 char *sanitize_value(const char *value, size_t value_size)
 {
-    char *sanitized = malloc(value_size + 1);
-    memcpy(sanitized, value, value_size);
+	const size_t size = (value_size * 3) + 1;
+    char *sanitized = malloc(size);
+    /*memcpy(sanitized, value, value_size);
     sanitized[value_size] = '\0';
-    return sanitized;
+    return sanitized;*/
+    return bin_to_ascii(value,value_size,sanitized);
 }
 
 

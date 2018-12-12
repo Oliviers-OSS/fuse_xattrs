@@ -22,7 +22,7 @@ AM_PROG_CC_C_O
 AC_PROG_RANLIB
 
 # Checks for header files.
-AC_CHECK_HEADERS([stddef.h sys/xattr.h])
+AC_CHECK_HEADERS([stddef.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_MODE_T
@@ -33,7 +33,7 @@ AC_TYPE_UID_T
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
-AC_CHECK_FUNCS([lchown memset mkdir mkfifo rmdir strdup])
+AC_CHECK_FUNCS([lchown setxattr memset mkdir mkfifo rmdir strdup])
 
 # Checks for pkg config and needed parameters files
 PKG_PROG_PKG_CONFIG

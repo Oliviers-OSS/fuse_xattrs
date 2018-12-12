@@ -9,6 +9,10 @@
   See the file COPYING.
 */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #define FUSE_USE_VERSION 30
 
 /* For pread()/pwrite()/utimensat() */

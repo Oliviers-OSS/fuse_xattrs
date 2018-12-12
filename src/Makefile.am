@@ -5,6 +5,7 @@ fuse_xattrs_SOURCES += binary_storage.c  binary_storage.h
 fuse_xattrs_SOURCES += passthrough.c  passthrough.h
 fuse_xattrs_SOURCES += utils.c  utils.h
 fuse_xattrs_SOURCES += xattrs_config.h fuse_xattrs_config.h
+fuse_xattrs_SOURCES += debug.h debug.cpp
 
 fuse_xattrs_CPPFLAGS =-D_SCM_LABEL="$(SCM_LABEL)"
 fuse_xattrs_CPPFLAGS +=-D_CONFIGDIR="$(sysconfdir)"
