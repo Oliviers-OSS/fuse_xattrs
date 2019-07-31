@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(fuse_xattr, 0.0.0.2,felipe@felipebarriga.cl)
+AC_INIT(fuse_xattr, 0.0.0.5,felipe@felipebarriga.cl)
 AC_CONFIG_SRCDIR([src/fuse_xattrs.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_MACRO_DIR([m4])
