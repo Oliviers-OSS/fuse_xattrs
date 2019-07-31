@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(fuse_xattr, 0.0.0.1,felipe@felipebarriga.cl)
+AC_INIT(fuse_xattr, 0.0.0.2,felipe@felipebarriga.cl)
 AC_CONFIG_SRCDIR([src/fuse_xattrs.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -22,18 +22,21 @@ AM_PROG_CC_C_O
 AC_PROG_RANLIB
 
 # Checks for header files.
-AC_CHECK_HEADERS([stddef.h])
+AC_CHECK_HEADERS([stddef.h fcntl.h syslog.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
+AC_C_INLINE
 AC_TYPE_MODE_T
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
 AC_TYPE_UID_T
+AC_TYPE_SSIZE_T
+AC_CHECK_TYPES([ptrdiff_t])
 
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
-AC_CHECK_FUNCS([lchown setxattr memset mkdir mkfifo rmdir strdup])
+AC_CHECK_FUNCS([lchown setxattr memset mkdir mkfifo rmdir strdup clock_gettime utimensat posix_fallocate setfsgid setfsuid])
 
 # Checks for pkg config and needed parameters files
 PKG_PROG_PKG_CONFIG
@@ -86,6 +89,8 @@ AC_SUBST(COMPTAGE_ROOT)
 	
 AC_CONFIG_FILES(Makefile 
 	src/Makefile	
+	tests/Makefile
+	tests/lcap/Makefile
 	)
 AC_OUTPUT
 

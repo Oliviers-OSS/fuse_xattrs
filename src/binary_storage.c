@@ -270,6 +270,12 @@ int binary_storage_write_key(const char *path, const char *name, const char *val
     int status;
     char *sidecar_path = get_sidecar_path(path);
     FILE *file = fopen(sidecar_path, "w");
+    if (!file) {
+    	const int error = errno;
+    	ERROR_MSG("fopen %s for writting error %d (%m)",sidecar_path,error);
+    	free(sidecar_path);
+    	return -error;
+    }
     free(sidecar_path);
 
     if (buffer == NULL) {

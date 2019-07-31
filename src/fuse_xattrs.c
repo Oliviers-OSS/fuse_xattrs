@@ -21,7 +21,9 @@
 /* For get_current_dir_name */
 #define _GNU_SOURCE
 
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
 
 #include <errno.h>
 #include <stdio.h>
@@ -31,40 +33,58 @@
 
 #include <fuse.h>
 #include <sys/xattr.h>
+#include <sys/fsuid.h>
 
 #include "fuse_xattrs_config.h"
-
+#include "debug.h"
 #include "xattrs_config.h"
 #include "utils.h"
 #include "passthrough.h"
 
 #include "binary_storage.h"
 
+#ifndef ENOATTR
+#define ENOATTR ENODATA        /* No such attribute */
+#endif
+
 static int xmp_setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
 	int error = 0;
-	if (lsetxattr(path, name, value, size, flags) == -1) {
+
+	if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
+		return -ENOENT;
+	}
+
+	struct fuse_context *context = fuse_get_context();
+	if (context) {
+		setfsgid(context->gid);
+		setfsuid(context->uid);
+	}
+
+	const enum namespace nmspc = get_namespace(name);
+	if ((nmspc != USER) &&  (nmspc != SECURITY)) {
+		debug_print("Only user namespace is supported. name=%s\n", name);
+		return -ENOATTR;
+	}
+
+	if (strcmp(name,"security.selinux") == 0) {
+		DEBUG_MSG("SELinux attributs are not supported");
+		return -ENOATTR;
+	}
+
+	if (strlen(name) > XATTR_NAME_MAX) {
+		debug_print("attribute name must be equal or smaller than %d bytes\n", XATTR_NAME_MAX);
+		return -ERANGE;
+	}
+	if (size > XATTR_SIZE_MAX) {
+		debug_print("attribute value cannot be bigger than %d bytes\n", XATTR_SIZE_MAX);
+		return -ENOSPC;
+	}
+
+	char *_path = prepend_source_directory(path);
+	if (lsetxattr(_path, name, value, size, flags) == -1) {
 		error = -errno;
-		if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
-			return -ENOENT;
-		}
-
-		const enum namespace nmspc = get_namespace(name);
-		if ((nmspc != USER) &&  (nmspc != SECURITY)) {
-			debug_print("Only user namespace is supported. name=%s\n", name);
-			return -ENOTSUP;
-		}
-		if (strlen(name) > XATTR_NAME_MAX) {
-			debug_print("attribute name must be equal or smaller than %d bytes\n", XATTR_NAME_MAX);
-			return -ERANGE;
-		}
-		if (size > XATTR_SIZE_MAX) {
-			debug_print("attribute value cannot be bigger than %d bytes\n", XATTR_SIZE_MAX);
-			return -ENOSPC;
-		}
-
-		char *_path = prepend_source_directory(path);
-
+		DEBUG_VAR(error,"%d (%m)");
 #ifdef DEBUG
 		char *sanitized_value = sanitize_value(value, size);
 		debug_print("path=%s name=%s value=%s size=%zu XATTR_CREATE=%d XATTR_REPLACE=%d\n",
@@ -74,8 +94,9 @@ static int xmp_setxattr(const char *path, const char *name, const char *value, s
 #endif
 
 		error = binary_storage_write_key(_path, name, value, size, flags);
-		free(_path);
 	}
+	free(_path);
+
 
 	return error;
 }
@@ -83,49 +104,72 @@ static int xmp_setxattr(const char *path, const char *name, const char *value, s
 static int xmp_getxattr(const char *path, const char *name, char *value, size_t size)
 {
 	int error = 0;
-	if (lgetxattr(path, name, value, size) == -1) {
+
+	struct fuse_context *context = fuse_get_context();
+	if (context) {
+		setfsgid(context->gid);
+		setfsuid(context->uid);
+	}
+
+	if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
+		return -ENOENT;
+	}
+
+	const enum namespace nmspc = get_namespace(name);
+	if ((nmspc != USER) &&  (nmspc != SECURITY)) {
+		debug_print("Only user namespace is supported. name=%s\n", name);
+		return -ENOATTR;
+	}
+
+	if (strcmp(name,"security.selinux") == 0) {
+		DEBUG_MSG("SELinux attributs are not supported");
+		return -ENOATTR;
+	}
+
+	if (strlen(name) > XATTR_NAME_MAX) {
+		debug_print("attribute name must be equal or smaller than %d bytes\n", XATTR_NAME_MAX);
+		return -ERANGE;
+	}
+
+	char *_path = prepend_source_directory(path);
+	if (lgetxattr(_path, name, value, size) == -1) {
 		error = -errno;
-		if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
-			return -ENOENT;
-		}
-
-		const enum namespace nmspc = get_namespace(name);
-		if ((nmspc != USER) &&  (nmspc != SECURITY)) {
-			debug_print("Only user namespace is supported. name=%s\n", name);
-			return -ENOTSUP;
-		}
-		if (strlen(name) > XATTR_NAME_MAX) {
-			debug_print("attribute name must be equal or smaller than %d bytes\n", XATTR_NAME_MAX);
-			return -ERANGE;
-		}
-
-		char *_path = prepend_source_directory(path);
+		DEBUG_VAR(error,"%d (%m)");
 		debug_print("path=%s name=%s size=%zu\n", _path, name, size);
 		error = binary_storage_read_key(_path, name, value, size);
-		free(_path);
 	}
+	free(_path);
+
 	return error;
 }
 
 static int xmp_listxattr(const char *path, char *list, size_t size)
 {
 	int error = 0;
-	if (llistxattr(path, list, size) == -1) {
+
+	if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
+		return -ENOENT;
+	}
+
+	if (size > XATTR_LIST_MAX) {
+		debug_print("The size of the list of attribute names for this file exceeds the system-imposed limit.\n");
+		return -E2BIG;
+	}
+
+	struct fuse_context *context = fuse_get_context();
+	if (context) {
+		setfsgid(context->gid);
+		setfsuid(context->uid);
+	}
+
+	char *_path = prepend_source_directory(path);
+	if (llistxattr(_path, list, size) == -1) {
 		error = -errno;
-		if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
-			return -ENOENT;
-		}
-
-		if (size > XATTR_LIST_MAX) {
-			debug_print("The size of the list of attribute names for this file exceeds the system-imposed limit.\n");
-			return -E2BIG;
-		}
-
-		char *_path = prepend_source_directory(path);
+		DEBUG_VAR(error,"%d (%m)");
 		debug_print("path=%s size=%zu\n", _path, size);
 		error = binary_storage_list_keys(_path, list, size);
-		free(_path);
 	}
+	free(_path);
 
 	return error;
 }
@@ -133,27 +177,41 @@ static int xmp_listxattr(const char *path, char *list, size_t size)
 static int xmp_removexattr(const char *path, const char *name)
 {
 	int error = 0;
+
+	if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
+		return -ENOENT;
+	}
+
+	const enum namespace nmspc = get_namespace(name);
+	if ((nmspc != USER) &&  (nmspc != SECURITY)) {
+		debug_print("Only user namespace is supported. name=%s\n", name);
+		return -ENOATTR;
+	}
+
+	if (strcmp(name,"security.selinux") == 0) {
+		DEBUG_MSG("SELinux attributs are not supported");
+		return -ENOATTR;
+	}
+
+	if (strlen(name) > XATTR_NAME_MAX) {
+		debug_print("attribute name must be equal or smaller than %d bytes\n", XATTR_NAME_MAX);
+		return -ERANGE;
+	}
+
+	struct fuse_context *context = fuse_get_context();
+	if (context) {
+		setfsgid(context->gid);
+		setfsuid(context->uid);
+	}
+
+	char *_path = prepend_source_directory(path);
 	if (lremovexattr(path, name) == -1) {
 		error = -errno;
-		if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
-			return -ENOENT;
-		}
-
-		const enum namespace nmspc = get_namespace(name);
-		if ((nmspc != USER) &&  (nmspc != SECURITY)) {
-			debug_print("Only user namespace is supported. name=%s\n", name);
-			return -ENOTSUP;
-		}
-		if (strlen(name) > XATTR_NAME_MAX) {
-			debug_print("attribute name must be equal or smaller than %d bytes\n", XATTR_NAME_MAX);
-			return -ERANGE;
-		}
-
-		char *_path = prepend_source_directory(path);
+		DEBUG_VAR(error,"%d (%m)");
 		debug_print("path=%s name=%s\n", _path, name);
 		error = binary_storage_remove_key(_path, name);
-		free(_path);
 	}
+	free(_path);
 
 	return error;
 }
@@ -174,21 +232,22 @@ static struct fuse_operations xmp_oper = {
 		.chown       = xmp_chown,
 		.truncate    = xmp_truncate,
 #ifdef HAVE_UTIMENSAT
-.utimens     = xmp_utimens,
+		.utimens     = xmp_utimens,
 #endif
-.open        = xmp_open,
-.read        = xmp_read,
-.write       = xmp_write,
-.statfs      = xmp_statfs,
-.release     = xmp_release,
-.fsync       = xmp_fsync,
+		.open        = xmp_open,
+		.create      = xmp_create,
+		.read        = xmp_read,
+		.write       = xmp_write,
+		.statfs      = xmp_statfs,
+		.release     = xmp_release,
+		.fsync       = xmp_fsync,
 #ifdef HAVE_POSIX_FALLOCATE
-.fallocate   = xmp_fallocate,
+		.fallocate   = xmp_fallocate,
 #endif
-.setxattr    = xmp_setxattr,
-.getxattr    = xmp_getxattr,
-.listxattr   = xmp_listxattr,
-.removexattr = xmp_removexattr,
+		.setxattr    = xmp_setxattr,
+		.getxattr    = xmp_getxattr,
+		.listxattr   = xmp_listxattr,
+		.removexattr = xmp_removexattr,
 };
 
 /**
