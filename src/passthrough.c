@@ -15,6 +15,8 @@
 
 #define FUSE_USE_VERSION 30
 
+#include "utils.h"
+
 /* For pread()/pwrite()/utimensat() */
 #define _XOPEN_SOURCE 700
 
@@ -28,7 +30,7 @@
 #include <sys/fsuid.h>
 
 #include "xattrs_config.h"
-#include "utils.h"
+
 
 static inline int chown_new_file(const char *path, struct fuse_context *fc)
 {
@@ -42,11 +44,7 @@ int xmp_getattr(const char *path, struct stat *stbuf) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = lstat(_path, stbuf);
@@ -64,11 +62,7 @@ int xmp_access(const char *path, int mask) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = access(_path, mask);
@@ -82,20 +76,15 @@ int xmp_access(const char *path, int mask) {
 
 int xmp_readlink(const char *path, char *buf, size_t size) {
 	int res;
-	if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
+	if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = readlink(_path, buf, size - 1);
 	free(_path);
-
 	if (res == -1)
 		return -errno;
 
@@ -111,11 +100,7 @@ int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	(void) offset;
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	if (fi != NULL && fi->fh != 0) {
 		dp = fdopendir(fi->fh);
@@ -151,11 +136,7 @@ int xmp_mknod(const char *path, mode_t mode, dev_t rdev) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 
@@ -184,11 +165,7 @@ int xmp_mkdir(const char *path, mode_t mode) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = mkdir(_path, mode);
@@ -206,11 +183,7 @@ int xmp_unlink(const char *path) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = unlink(_path);
@@ -239,11 +212,7 @@ int xmp_rmdir(const char *path) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = rmdir(_path);
@@ -263,11 +232,7 @@ int xmp_symlink(const char *from, const char *to) {
 		}
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_to = prepend_source_directory(to);
 	res = symlink(from, _to);
@@ -287,11 +252,7 @@ int xmp_rename(const char *from, const char *to) {
 		}
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_from = prepend_source_directory(from);
 	char *_to = prepend_source_directory(to);
@@ -330,11 +291,7 @@ int xmp_link(const char *from, const char *to) {
 		}
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_from = prepend_source_directory(from);
 	char *_to = prepend_source_directory(to);
@@ -354,11 +311,7 @@ int xmp_chmod(const char *path, mode_t mode) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = chmod(_path, mode);
@@ -376,11 +329,7 @@ int xmp_chown(const char *path, uid_t uid, gid_t gid) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = lchown(_path, uid, gid);
@@ -398,11 +347,7 @@ int xmp_truncate(const char *path, off_t size) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = truncate(_path, size);
@@ -425,11 +370,7 @@ int xmp_utimens(const char *path, const struct timespec ts[2],
 	(void) fi;
 	int res;
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	/* don't use utime/utimes since they follow symlinks */
@@ -448,11 +389,7 @@ int xmp_open(const char *path, struct fuse_file_info *fi) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	fd = open(_path, fi->flags);
@@ -469,11 +406,7 @@ int xmp_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
     int res;
     char *_path = prepend_source_directory(path);
 
-    struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+    struct fuse_context *context = setCallerIdentity();
 
     int fd = open(_path, fi->flags, mode & 0777);
     if (fd == -1) {
@@ -495,11 +428,7 @@ int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 		return -1;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	int res = pread(fi->fh, buf, size, offset);
 	if (res == -1)
@@ -516,11 +445,7 @@ int xmp_write(const char *path, const char *buf, size_t size,
 		return -1;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	int res = pwrite(fi->fh, buf, size, offset);
 	if (res == -1)
@@ -535,11 +460,7 @@ int xmp_statfs(const char *path, struct statvfs *stbuf) {
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	res = statvfs(_path, stbuf);
@@ -580,11 +501,7 @@ int xmp_fallocate(const char *path, int mode,
 	if (mode)
 		return -EOPNOTSUPP;
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	res = -posix_fallocate(fi->fh, offset, length);
 	return res;

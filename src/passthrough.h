@@ -9,6 +9,9 @@
   See the file COPYING.
 */
 
+#ifndef FUSE_XATTRS_PASSTHROUGH_H
+#define FUSE_XATTRS_PASSTHROUGH_H
+
 #include <fuse.h>
 
 int xmp_getattr(const char *path, struct stat *stbuf);
@@ -35,3 +38,4 @@ int xmp_release(const char *path, struct fuse_file_info *fi);
 int xmp_fsync(const char *path, int isdatasync, struct fuse_file_info *fi);
 int xmp_fallocate(const char *path, int mode, off_t offset, off_t length, struct fuse_file_info *fi);
 
+#endif /*FUSE_XATTRS_PASSTHROUGH_H*/

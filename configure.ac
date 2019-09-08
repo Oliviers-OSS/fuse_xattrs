@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
-AC_INIT(fuse_xattr, 0.0.0.5,felipe@felipebarriga.cl)
+AC_INIT(fuse_xattr, 0.0.0.6,felipe@felipebarriga.cl)
 AC_CONFIG_SRCDIR([src/fuse_xattrs.c])
 AC_CONFIG_HEADER([config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -22,7 +22,7 @@ AM_PROG_CC_C_O
 AC_PROG_RANLIB
 
 # Checks for header files.
-AC_CHECK_HEADERS([stddef.h fcntl.h syslog.h])
+AC_CHECK_HEADERS([stddef.h fcntl.h syslog.h limits.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_INLINE
@@ -57,10 +57,12 @@ AC_ARG_ENABLE(debug,
 )
 if test "$enable_debug" = "yes"; then
         AC_DEFINE(_DEBUG_, 1, [Defined if debug mode is enabled (it's easier to check).])        
+        AC_DEFINE(DEBUG, 1, [Defined if debug mode is enabled (it's easier to check).])
 fi
 
 if test "$enable_debug" = "no"; then
         AC_DEFINE(NDEBUG, 1, [Defined if debug mode is disabled.])
+        AC_DEFINE(DEBUG, 0, [Defined if debug mode is enabled (it's easier to check).])
 fi
 
 #if test "${enable_retail}" = "yes"; then

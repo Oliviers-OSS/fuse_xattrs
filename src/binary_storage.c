@@ -16,6 +16,8 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "debug.h"
 #include "binary_storage.h"
@@ -269,7 +271,9 @@ int binary_storage_write_key(const char *path, const char *name, const char *val
 
     int status;
     char *sidecar_path = get_sidecar_path(path);
+    mode_t old_umask = umask(0022);
     FILE *file = fopen(sidecar_path, "w");
+    umask(old_umask);
     if (!file) {
     	const int error = errno;
     	ERROR_MSG("fopen %s for writting error %d (%m)",sidecar_path,error);

@@ -4,9 +4,9 @@
 
 This filesystem provides xattr support using sidecar files.
 
-## Latest version
+## Original latest version
 
-The latest version and more information can be found on
+The original latest version and more information can be found on
 http://github.com/fbarriga/fuse_xattrs
 
 
@@ -27,7 +27,7 @@ Archlinux (https://aur.archlinux.org/packages/fuse_xattrs/):
     yaourt -S fuse_xattrs
 
 
-## Building
+## Original building (using cmake)
 
 First you need to download FUSE 2.9 or later from
 http://github.com/libfuse/libfuse.
@@ -36,7 +36,14 @@ http://github.com/libfuse/libfuse.
     cmake ..
     make
 
-## Code Coverage
+## Building this release (using autotools)
+First you need to download FUSE 2.9 or later from
+http://github.com/libfuse/libfuse 
+or install the Fuse developers package of your distribution
+
+    ./autogen.sh && ./configure && make
+
+## Original Code Coverage
 
     mkdir build && cd build
     cmake -DENABLE_CODECOVERAGE=1 -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_BUILD_TYPE=Debug ..

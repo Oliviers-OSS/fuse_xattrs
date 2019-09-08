@@ -55,11 +55,7 @@ static int xmp_setxattr(const char *path, const char *name, const char *value, s
 		return -ENOENT;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	const enum namespace nmspc = get_namespace(name);
 	if ((nmspc != USER) &&  (nmspc != SECURITY)) {
@@ -105,11 +101,7 @@ static int xmp_getxattr(const char *path, const char *name, char *value, size_t 
 {
 	int error = 0;
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	if (xattrs_config.show_sidecar == 0 && filename_is_sidecar(path) == 1)  {
 		return -ENOENT;
@@ -156,11 +148,7 @@ static int xmp_listxattr(const char *path, char *list, size_t size)
 		return -E2BIG;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	if (llistxattr(_path, list, size) == -1) {
@@ -198,11 +186,7 @@ static int xmp_removexattr(const char *path, const char *name)
 		return -ERANGE;
 	}
 
-	struct fuse_context *context = fuse_get_context();
-	if (context) {
-		setfsgid(context->gid);
-		setfsuid(context->uid);
-	}
+	setCallerIdentity();
 
 	char *_path = prepend_source_directory(path);
 	if (lremovexattr(path, name) == -1) {
